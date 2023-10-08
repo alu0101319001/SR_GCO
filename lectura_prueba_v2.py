@@ -54,4 +54,5 @@ df2 = func.create_df(all_corr)
 print("Correlación de Pearson de usuarios con NaN: \n", df2)
 
 """
+PRUEBA
 """
