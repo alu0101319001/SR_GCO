@@ -14,6 +14,10 @@ MEDIA = 2
 NONE = 0
 ERROR = -1
 
+CORR_COL_0 = "u"
+CORR_COL_1 = "v"
+CORR_COL_2 = "corr"
+
 # Lee y procesa el fichero de input
 def process_input_file(file_name): 
     with open(file_name, 'r') as f:
@@ -65,7 +69,29 @@ def find_nan_positions(df):
     return nan_positions
 
 # Crea un data_frame a partir de la matriz de numpy
-def create_df(matrix):
+def create_utility_df(matrix):
     df = pd.DataFrame(matrix)
+    # Renombrar las columans automáticamente
+    new_column_names = [f'Item{i}' for i in range(len(df.columns))]
+    df.columns = new_column_names
+    
+    # Renombrar las filas automáticamente
+    new_index_names = [f'User{j}' for j in range(len(df.index))]
+    df.index = new_index_names
     return df
+
+def create_sim_df(matrix):
+    df = pd.DataFrame(matrix)
+    # Generar los nombres de las filas automáticamente basados en los valores de las columnas 1 y 2
+    new_index_names = [f'Sim{int(col[0])}{int(col[1])}' for _, col in df.iterrows()]
+    
+    # Renombrar las filas
+    df.index = new_index_names
+    
+    # Renombrar las columnas automáticamente
+    new_column_names = [CORR_COL_0, CORR_COL_1, CORR_COL_2]
+    df.columns = new_column_names
+    
+    return df
+
         

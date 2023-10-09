@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import functions as func
 import metrica_func as mf
+import predicción_func as pf
 
 parser = argparse.ArgumentParser()
 
@@ -36,7 +37,7 @@ print("Matriz de Utilidad:\n", input_data[2])
 
 matrix_normalizada = func.normalizar(input_data[2], input_data[0], input_data[1])
 
-df = func.create_df(matrix_normalizada)
+df = func.create_utility_df(matrix_normalizada)
 
 print("Matriz de Utilidad Normalizada (DF): \n", df)
 
@@ -44,14 +45,29 @@ nan_positions = func.find_nan_positions(df)
 
 print("Posiciones de NaN en el DataFrame: \n", nan_positions)
 
-all_corr = []
-for i in range(len(nan_positions)):
-    data_corr = mf.pearson(df, nan_positions[i,0])
-    all_corr.append(data_corr)
-    
-df2 = func.create_df(all_corr)
+# Aquí faltaría un proceso de selección del NaN a calcular
 
-print("Correlación de Pearson de usuarios con NaN: \n", df2)
+# Se elige un NaN y empieza un ciclo
+print("Posición NaN seleccionada")
+all_sim = mf.calculate_similarity(df, nan_positions, options[0])
+print("Calculo de similitudes:")
+
+all_selected = []
+for i in range(len(all_sim)):
+    print("Similitud:", i)
+    print(all_sim[i])        
+    selected = pf.select_neighbors(all_sim[i], neighbors)
+    all_selected.append(selected)
+       
+print("Vecinos seleccionados:")
+for i in range(len(all_selected)):
+    print("Selección: ", i)
+    print(all_selected[i])
+
+    
+# df2 = func.create_df(all_corr)
+
+# print("Correlación de Pearson de usuarios con NaN: \n", df2)
 
 """
 PRUEBA
