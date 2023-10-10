@@ -13,16 +13,18 @@ import functions as func
 ROUND_VALUE = 2
 
 def calculate_similarity(df, nan_positions, metrics):
-    all_sim = []
-    for i in range(len(nan_positions)):
-        data_corr = pearson(df, nan_positions[i,0])
-        df_corr = func.create_sim_df(data_corr)
-        # print(df_corr)
-        all_sim.append(df_corr) 
-        
-    return all_sim
+    # Falta un switch para el selector de métrica
+    data_corr = pearson(df, nan_positions[0])
+    
+    df_sim = func.create_sim_df(data_corr)
+       
+    return df_sim
 
 def pearson(df, user_select):
+    # Faltaría seleccionar los items que se van a utilizar para la correlación
+    # antes de usar directamente pearson. Para tener control sobre ellos
+    # usar NaN previamentes calculados o no? 
+    
     # print("User select ", user_select, "\n",df.iloc[user_select])
     data_corr = []
     for i in range(len(df)):

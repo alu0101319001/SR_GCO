@@ -37,32 +37,37 @@ print("Matriz de Utilidad:\n", input_data[2])
 
 matrix_normalizada = func.normalizar(input_data[2], input_data[0], input_data[1])
 
-df = func.create_utility_df(matrix_normalizada)
+utility_df = func.create_utility_df(matrix_normalizada)
 
-print("Matriz de Utilidad Normalizada (DF): \n", df)
+print("Matriz de Utilidad Normalizada (DF): \n", utility_df)
 
-nan_positions = func.find_nan_positions(df)
+nan_positions = func.find_nan_positions(utility_df)
 
-print("Posiciones de NaN en el DataFrame: \n", nan_positions)
+print("\nPosiciones de NaN en el DataFrame: \n", nan_positions)
 
 # Aquí faltaría un proceso de selección del NaN a calcular
 
-# Se elige un NaN y empieza un ciclo
-print("Posición NaN seleccionada")
-all_sim = mf.calculate_similarity(df, nan_positions, options[0])
-print("Calculo de similitudes:")
+# Se elige un NaN y empieza un ciclo (ahora forzado)
+nan_selected = nan_positions[0]
+print("\nPosición NaN seleccionada:", nan_selected)
 
-all_selected = []
-for i in range(len(all_sim)):
-    print("Similitud:", i)
-    print(all_sim[i])        
-    selected = pf.select_neighbors(all_sim[i], neighbors)
-    all_selected.append(selected)
-       
-print("Vecinos seleccionados:")
-for i in range(len(all_selected)):
-    print("Selección: ", i)
-    print(all_selected[i])
+# Obtiene el df con la similaridad entre usuarios 
+df_sim = mf.calculate_similarity(utility_df, nan_selected, options[0])
+print("\nCalculo de similitudes:")    
+print(df_sim)      
+
+# Proceso de selección de vecinos
+# Devuelve df_sim, con solo las similitudes seleccionadas
+neighbors_selected = pf.select_neighbors(df_sim, neighbors)
+print("\nVecinos seleccionados:")
+print(neighbors_selected)
+
+# Cálculo de predicciones
+sol_val = pf.calculate_prediction(utility_df, nan_selected, neighbors_selected, options[2])
+print("\nValor de la predicción: ", sol_val)
+print("Desnormalizado:", func.desnormalizar(sol_val, input_data[0], input_data[1]))
+
+# Añadir los valores calculados a un data-frame de soluciones
 
     
 # df2 = func.create_df(all_corr)

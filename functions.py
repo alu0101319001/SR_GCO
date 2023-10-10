@@ -63,6 +63,11 @@ def process_options(metrics, neighbors, prediction):
 def normalizar(val: float, min: float, max: float):
     return (val-min)/(max-min)
 
+# Desnormaliza
+def desnormalizar(val: float, min: float, max: float):
+    sol = val * (max - min) + min
+    return sol 
+
 # Devuelve una matriz con las posiciones de NaN
 def find_nan_positions(df): 
     nan_positions = np.argwhere(df.isnull().values)
