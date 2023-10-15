@@ -68,6 +68,7 @@ print("\nValor de la predicción: ", sol_val)
 print("Desnormalizado:", func.desnormalizar(sol_val, input_data[0], input_data[1]))
 
 # Añadir los valores calculados a un data-frame de soluciones
+sol_df = func.create_sol_df()
 
     
 # df2 = func.create_df(all_corr)

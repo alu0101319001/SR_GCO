@@ -99,4 +99,8 @@ def create_sim_df(matrix):
     
     return df
 
+def create_sol_df():
+    sol_df = pd.DataFrame(columns=['Pos_NaN', 'Predic_Value'])
+    return sol_df
+
         
