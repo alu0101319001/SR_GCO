@@ -17,6 +17,7 @@ parser.add_argument("-r", "--read", type=str, nargs='?', default='utility_matrix
 parser.add_argument("-m", "--metrics", type=str, nargs='?', default='pearson')
 parser.add_argument("-n", "--neighbors", type=int, nargs='?', default=2)
 parser.add_argument("-p", "--prediction", type=str, nargs='?', default='simple')
+parser.add_argument("-o", "--output", type=str, nargs='?', default='console')
 args = parser.parse_args()
 
 # print(args.read, args.metrics, args.neighbors, args.prediction)
@@ -25,6 +26,7 @@ file_name: str = args.read
 metrics: str = args.metrics
 neighbors: int = args.neighbors
 prediction: str = args.prediction
+output: str = args.output
 
-test = cfrc.C_F_Recommender(file_name, metrics, neighbors, prediction)
+test = cfrc.C_F_Recommender(file_name, metrics, neighbors, prediction, output)
 test.start()

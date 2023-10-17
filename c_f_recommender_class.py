@@ -31,19 +31,25 @@ CORR_COL_1 = "v"
 CORR_COL_2 = "corr"
 ROUND_VALUE = 2
 MIN_NEIGHBORS = 2
+SOL_COL_0 = 'NaN_Pos'
+SOL_COL_1 = 'Sol_Val'
 
 # La clase que recoje el proceso de un recomendador por el método de filtro colaborativo
 class C_F_Recommender:
     
     # Inicializador de la clase - parámetros de entrada
-    def __init__(self, file_name, metrics, neighbors, prediction):
+    def __init__(self, file_name, metrics, neighbors, prediction, 
+                 output_mode="console"):
         # Atributos de la clase
         # Se dan como parámetros de creación
         self.file_name = file_name
         self.input_metrics = metrics
         self.neighbors = neighbors
         self.input_prediction  = prediction   
-        # Se asignaran en el proceso de inicializacion
+        self.output_mode = output_mode
+        # Se asginan en esta inicialización
+        self.output_file = file_name.replace(".txt", "_output.txt")
+        # Se asignaran en la función start
         self.norm_metrics = None
         self.norm_prediction = None
         self.min_value = None
@@ -66,29 +72,35 @@ class C_F_Recommender:
     def start(self):
         # Procesa toda la información de entrada y crea la estructura inicial de datos
         self.process_input()
-        print(self.utility_df)
-        print(self.nan_positions)
-        print(self.invalid_items)
-        print(self.copy_nan_positions)
+        self.create_sol_df()
+
+        self.log(self.utility_df)
+        self.log(self.nan_positions)
+        self.log(self.invalid_items)
+        self.log(self.copy_nan_positions)
         # Empieza el ciclo
         while self.copy_nan_positions.size > 0:
             # Selecciona el NaN a calcular
             self.select_nan_to_calculate()
-            print(self.nan_selected)
+            self.log(self.nan_selected)
             # Calcula la similaridad
             self.calculate_similarity()
-            print(self.sim_df)
+            self.log(self.sim_df)
             # Selecciona vecinos
             self.select_neighbors()
-            print(self.neighbors_selected)
+            self.log(self.neighbors_selected)
             # Calcula la predicción
             self.calcualte_prediction()
-            print(self.sol_val, self.desnormalizar(self.sol_val))
+            self.log(self.sol_val)
+            self.log(self.desnormalizar(self.sol_val))
             # Añade la solución
-            
+            self.add_solution()
             # Decisión: usar valores de NaN calculados o no?
             
-        print('finish')
+        self.log(self.sol_df)
+        self.log('finish')
+            # Restaura la salida estándar original
+            # sys.stdout = sys.__stdout__
             
         
 
@@ -213,7 +225,11 @@ class C_F_Recommender:
             if len(non_nan_values) < MIN_NEIGHBORS:
                 self.invalid_items.append(int(item[4:]))
                 
-
+    def add_solution(self):
+        temp_df = pd.DataFrame([[self.nan_selected, self.sol_val]],
+                               columns=[SOL_COL_0, SOL_COL_1])
+        self.sol_df = pd.concat([self.sol_df, temp_df], ignore_index=True)
+        
 ### MÉTRICAS DE SIMILITUD ###
     def pearson(self):
         data_corr = []
@@ -283,6 +299,10 @@ class C_F_Recommender:
         # Renombrar las columnas automáticamente
         new_column_names = [CORR_COL_0, CORR_COL_1, CORR_COL_2]
         self.sim_df.columns = new_column_names
+        
+    def create_sol_df(self):
+        col = [SOL_COL_0, SOL_COL_1]
+        self.sol_df = pd.DataFrame(columns=col)
     
 ### NORMALIZACION ###
     # Normaliza los valores entre 0 y 1
@@ -293,7 +313,16 @@ class C_F_Recommender:
     def desnormalizar(self, val: float):
         sol = val * (self.max_value - self.min_value) + self.min_value
         return sol 
-                
+    
+### VISUALIZACION ###
+    def log(self, msg):
+        if self.output_mode == 'console':
+            print(msg)
+        elif self.output_mode == 'file':
+            with open(self.output_file, "a") as f:
+                f.write(str(msg) + "\n")
+    
+         
         
         
         
