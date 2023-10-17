@@ -9,6 +9,7 @@ Intento de aunar todo en forma de clase
 
 import argparse
 import sys
+import os
 import numpy as np
 import pandas as pd
 
@@ -20,7 +21,7 @@ pd.options.display.max_rows = None
 
 # Constantes de selección y error
 PEARSON = 1
-COSENO = 2
+COSINE = 2
 EUCLIDEA = 3
 SIMPLE = 1
 MEDIA = 2
@@ -33,6 +34,7 @@ ROUND_VALUE = 2
 MIN_NEIGHBORS = 2
 SOL_COL_0 = 'NaN_Pos'
 SOL_COL_1 = 'Sol_Val'
+SOL_COL_2 = 'Desn_Sol_Val'
 
 # La clase que recoje el proceso de un recomendador por el método de filtro colaborativo
 class C_F_Recommender:
@@ -71,6 +73,7 @@ class C_F_Recommender:
         self.sol_df = None
 
     def start(self):
+        self.restore_output_file()
         # Procesa toda la información de entrada y crea la estructura inicial de datos
         self.process_input()
         self.create_sol_df()
@@ -92,8 +95,9 @@ class C_F_Recommender:
             self.log(self.neighbors_selected)
             # Calcula la predicción
             self.calcualte_prediction()
-            self.log(self.sol_val)
-            self.log(self.desnormalizar(self.sol_val))
+            sol = "Valor: " + str(self.sol_val)
+            sol += " | Valor Desnormalizado: " + str(self.desnormalizar(self.sol_val))
+            self.log(sol)
             # Añade la solución
             self.add_solution()
             # Decisión: usar valores de NaN calculados o no?
@@ -127,8 +131,8 @@ class C_F_Recommender:
     def process_options(self):
         if self.input_metrics == 'pearson': 
             self.norm_metrics = PEARSON
-        elif self.input_metrics == 'coseno':
-            self.norm_metrics = COSENO
+        elif self.input_metrics == 'cosine':
+            self.norm_metrics = COSINE
         elif self.input_metrics == 'euclidea':
             self.norm_metrics = EUCLIDEA
         else:
@@ -194,8 +198,8 @@ class C_F_Recommender:
     def calculate_similarity(self):
         if self.norm_metrics == PEARSON:
             data_corr = self.pearson()
-        elif self.norm_metrics == COSENO:
-            data_corr = []
+        elif self.norm_metrics == COSINE:
+            data_corr = self.cosine()
         elif self.norm_metrics == EUCLIDEA:
             data_corr = []
         else:
@@ -244,7 +248,30 @@ class C_F_Recommender:
                     corr = np.corrcoef(calif_user_selected[comun_calif], calif_user_current[comun_calif])[0, 1]
                     data_corr.append([user_selected_label[4:], user[4:], round(corr, ROUND_VALUE + 1)])
         return(data_corr)
-        
+    
+    def cosine(self):
+        data_corr = []
+        user_selected_label = self.utility_df.index[self.nan_selected[0]]
+        calif_user_selected = self.utility_df.loc[user_selected_label].dropna()
+        for user in self.utility_df.index:
+            if user != user_selected_label:
+                calif_user_current = self.utility_df.loc[user].dropna()
+                comun_calif = calif_user_selected.index.intersection(calif_user_current.index)
+                
+                # Cosine
+                # Prdocuto escalar entre los vectores de calificaciones
+                dot_product = np.dot(calif_user_selected[comun_calif], calif_user_current[comun_calif])
+                # Calcula las normas de los vectores
+                norm_user_selected = np.linalg.norm(calif_user_selected[comun_calif])
+                norm_user_current = np.linalg.norm(calif_user_current[comun_calif])
+                # Evita divisiones por cero
+                if norm_user_selected == 0 or norm_user_current == 0:
+                    return 0.0
+                # Calcula la similitud del coseno
+                similarity = dot_product / (norm_user_selected * norm_user_current)
+                data_corr.append([user_selected_label[4:], user[4:], round(similarity, ROUND_VALUE + 1)])
+        return(data_corr)
+    
 ### CALCULO DE PREDICCIONES ###
     def simple_prediction(self):
         top_summation = 0
@@ -300,13 +327,13 @@ class C_F_Recommender:
         self.sim_df.columns = new_column_names
         
     def create_sol_df(self):
-        col = [SOL_COL_0, SOL_COL_1]
+        col = [SOL_COL_0, SOL_COL_1, SOL_COL_2]
         self.sol_df = pd.DataFrame(columns=col)
         
                         
     def add_solution(self):
-        temp_df = pd.DataFrame([[self.nan_selected, self.sol_val]],
-                               columns=[SOL_COL_0, SOL_COL_1])
+        temp_df = pd.DataFrame([[self.nan_selected, self.sol_val, self.desnormalizar(self.sol_val)]],
+                               columns=[SOL_COL_0, SOL_COL_1, SOL_COL_2])
         self.sol_df = pd.concat([self.sol_df, temp_df], ignore_index=True)
         
     def add_calculated_NaN(self):
@@ -323,7 +350,7 @@ class C_F_Recommender:
     # Desnormaliza
     def desnormalizar(self, val: float):
         sol = val * (self.max_value - self.min_value) + self.min_value
-        return sol 
+        return round(sol, ROUND_VALUE) 
     
 ### VISUALIZACION ###
     def log(self, msg):
@@ -333,6 +360,9 @@ class C_F_Recommender:
             with open(self.output_file, "a") as f:
                 f.write(str(msg) + "\n")
     
+    def restore_output_file(self):
+            if os.path.exists(self.output_file):
+                os.remove(self.output_file)
          
         
         
