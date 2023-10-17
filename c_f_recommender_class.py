@@ -39,7 +39,7 @@ class C_F_Recommender:
     
     # Inicializador de la clase - parámetros de entrada
     def __init__(self, file_name, metrics, neighbors, prediction, 
-                 output_mode="console"):
+                 output_mode="console", use_calculated_nan=True):
         # Atributos de la clase
         # Se dan como parámetros de creación
         self.file_name = file_name
@@ -47,6 +47,7 @@ class C_F_Recommender:
         self.neighbors = neighbors
         self.input_prediction  = prediction   
         self.output_mode = output_mode
+        self.use_calculated_nan = use_calculated_nan
         # Se asginan en esta inicialización
         self.output_file = file_name.replace(".txt", "_output.txt")
         # Se asignaran en la función start
@@ -96,14 +97,16 @@ class C_F_Recommender:
             # Añade la solución
             self.add_solution()
             # Decisión: usar valores de NaN calculados o no?
+            if self.use_calculated_nan:
+                self.add_calculated_NaN()
+                self.log("NUEVA UTILITY DF")
+                self.log(self.utility_df)
+                
             
         self.log(self.sol_df)
         self.log('finish')
-            # Restaura la salida estándar original
-            # sys.stdout = sys.__stdout__
-            
+          
         
-
     def process_input(self):
         self.process_input_file()
         self.process_options()
@@ -224,11 +227,7 @@ class C_F_Recommender:
             non_nan_values = self.utility_df[item].dropna()
             if len(non_nan_values) < MIN_NEIGHBORS:
                 self.invalid_items.append(int(item[4:]))
-                
-    def add_solution(self):
-        temp_df = pd.DataFrame([[self.nan_selected, self.sol_val]],
-                               columns=[SOL_COL_0, SOL_COL_1])
-        self.sol_df = pd.concat([self.sol_df, temp_df], ignore_index=True)
+
         
 ### MÉTRICAS DE SIMILITUD ###
     def pearson(self):
@@ -276,7 +275,7 @@ class C_F_Recommender:
         self.sol_val = round(sol, ROUND_VALUE)
         
         
-### CREACIONES DE DATAFRAMES ####
+### CREACIONES y MODIFICACIONES DE DATAFRAMES ####
     def create_utility_df(self):
         normalized_matrix = self.normalizar(self.__utility_matrix)
         
@@ -303,6 +302,18 @@ class C_F_Recommender:
     def create_sol_df(self):
         col = [SOL_COL_0, SOL_COL_1]
         self.sol_df = pd.DataFrame(columns=col)
+        
+                        
+    def add_solution(self):
+        temp_df = pd.DataFrame([[self.nan_selected, self.sol_val]],
+                               columns=[SOL_COL_0, SOL_COL_1])
+        self.sol_df = pd.concat([self.sol_df, temp_df], ignore_index=True)
+        
+    def add_calculated_NaN(self):
+        # Actualiza el valor en utility_df
+        user_index = self.utility_df.index[self.nan_selected[0]]
+        item_column = self.utility_df.columns[self.nan_selected[1]]
+        self.utility_df.at[user_index, item_column] = self.sol_val
     
 ### NORMALIZACION ###
     # Normaliza los valores entre 0 y 1
