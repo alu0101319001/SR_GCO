@@ -73,42 +73,47 @@ class C_F_Recommender:
         self.sol_df = None
 
     def start(self):
-        self.restore_output_file()
-        # Procesa toda la información de entrada y crea la estructura inicial de datos
-        self.process_input()
-        self.create_sol_df()
-
-        self.log(self.utility_df)
-        self.log(self.nan_positions)
-        self.log(self.invalid_items)
-        self.log(self.copy_nan_positions)
-        # Empieza el ciclo
-        while self.copy_nan_positions.size > 0:
-            # Selecciona el NaN a calcular
-            self.select_nan_to_calculate()
-            self.log(self.nan_selected)
-            # Calcula la similaridad
-            self.calculate_similarity()
-            self.log(self.sim_df)
-            # Selecciona vecinos
-            self.select_neighbors()
-            self.log(self.neighbors_selected)
-            # Calcula la predicción
-            self.calcualte_prediction()
-            sol = "Valor: " + str(self.sol_val)
-            sol += " | Valor Desnormalizado: " + str(self.desnormalizar(self.sol_val))
-            self.log(sol)
-            # Añade la solución
-            self.add_solution()
-            # Decisión: usar valores de NaN calculados o no?
-            if self.use_calculated_nan:
-                self.add_calculated_NaN()
-                self.log("NUEVA UTILITY DF")
-                self.log(self.utility_df)
+        try:
+            self.restore_output_file()
+            # Procesa toda la información de entrada y crea la estructura inicial de datos
+            self.process_input()
+            self.create_sol_df()
+    
+            self.log(self.utility_df)
+            self.log(self.nan_positions)
+            self.log(self.invalid_items)
+            self.log(self.copy_nan_positions)
+            # Empieza el ciclo
+            while self.copy_nan_positions.size > 0:
+                # Selecciona el NaN a calcular
+                self.select_nan_to_calculate()
+                self.log(self.nan_selected)
+                # Calcula la similaridad
+                self.calculate_similarity()
+                self.log(self.sim_df)
+                # Selecciona vecinos
+                self.select_neighbors()
+                self.log(self.neighbors_selected)
+                # Calcula la predicción
+                self.calcualte_prediction()
+                sol = "Valor: " + str(self.sol_val)
+                sol += " | Valor Desnormalizado: " + str(self.desnormalizar(self.sol_val))
+                self.log(sol)
+                # Añade la solución
+                self.add_solution()
+                # Decisión: usar valores de NaN calculados o no?
+                if self.use_calculated_nan:
+                    self.add_calculated_NaN()
+                    self.log("NUEVA UTILITY DF")
+                    self.log(self.utility_df)
+                    
                 
-            
-        self.log(self.sol_df)
-        self.log('finish')
+            self.log(self.sol_df)
+            self.log('finish')
+        except Exception as error:
+            print(f'Exception: {error}')
+        except:
+            print("Something else went wrong")
           
         
     def process_input(self):
@@ -120,13 +125,17 @@ class C_F_Recommender:
 
         
     def process_input_file(self):
-        with open(self.file_name, 'r') as f:
-            self.min_value = float(f.readline())
-            # print(min)
-            self.max_value = float(f.readline())
-            # print(max)
-
-        self.__utility_matrix = np.genfromtxt(self.file_name, dtype='f', delimiter=' ', skip_header=2, missing_values="-")
+        try:
+            with open(self.file_name, 'r') as f:
+                self.min_value = float(f.readline())
+                self.max_value = float(f.readline())
+                if self.min_value >= self.max_value:  
+                    raise ValueError(f'The minimum value cannot exceed or equal the maximum value: Min({self.min_value}) - Max({self.max_value})')
+            self.__utility_matrix = np.genfromtxt(self.file_name, dtype='f', delimiter=' ', skip_header=2, missing_values="-")
+            
+        except FileNotFoundError as fnf_error:
+            self.log(fnf_error)
+            self.log(f"Explanation: Cannot load file {self.file_name}")
         
     def process_options(self):
         if self.input_metrics == 'pearson': 
@@ -379,7 +388,17 @@ class C_F_Recommender:
     def restore_output_file(self):
             if os.path.exists(self.output_file):
                 os.remove(self.output_file)
-         
+                
+### CONTROL DE ERRORES
+    def check_utility_matrix_values(self):
+        try:
+            check = np.all((self.__utility_matrix >= self.min_value) 
+                           & (self.__utility_matrix <= self.max_value))
+            if not check:
+                 raise ValueError('Not all values ​​in the utility matrix are within the set range. Check the file input data.')
+        except ValueError as e:
+            print(f'Explanation: {e}')
+             
         
         
         
