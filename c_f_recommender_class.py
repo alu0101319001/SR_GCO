@@ -22,14 +22,14 @@ pd.options.display.max_rows = None
 # Constantes de selección y error
 PEARSON = 1
 COSINE = 2
-EUCLIDEA = 3
+EUCLIDEAN = 3
 SIMPLE = 1
 MEDIA = 2
 NONE = 0
 ERROR = -1
 CORR_COL_0 = "u"
 CORR_COL_1 = "v"
-CORR_COL_2 = "corr"
+CORR_COL_2 = "sim"
 ROUND_VALUE = 2
 MIN_NEIGHBORS = 2
 SOL_COL_0 = 'NaN_Pos'
@@ -133,8 +133,8 @@ class C_F_Recommender:
             self.norm_metrics = PEARSON
         elif self.input_metrics == 'cosine':
             self.norm_metrics = COSINE
-        elif self.input_metrics == 'euclidea':
-            self.norm_metrics = EUCLIDEA
+        elif self.input_metrics == 'euclidean':
+            self.norm_metrics = EUCLIDEAN
         else:
             self.norm_metrics = None
             
@@ -200,8 +200,8 @@ class C_F_Recommender:
             data_corr = self.pearson()
         elif self.norm_metrics == COSINE:
             data_corr = self.cosine()
-        elif self.norm_metrics == EUCLIDEA:
-            data_corr = []
+        elif self.norm_metrics == EUCLIDEAN:
+            data_corr = self.euclidean()
         else:
             # Error
             return -1
@@ -269,6 +269,22 @@ class C_F_Recommender:
                     return 0.0
                 # Calcula la similitud del coseno
                 similarity = dot_product / (norm_user_selected * norm_user_current)
+                data_corr.append([user_selected_label[4:], user[4:], round(similarity, ROUND_VALUE + 1)])
+        return(data_corr)
+    
+    def euclidean(self):
+        data_corr = []
+        user_selected_label = self.utility_df.index[self.nan_selected[0]]
+        calif_user_selected = self.utility_df.loc[user_selected_label].dropna()
+        for user in self.utility_df.index:
+            if user != user_selected_label:
+                calif_user_current = self.utility_df.loc[user].dropna()
+                comun_calif = calif_user_selected.index.intersection(calif_user_current.index)
+                
+                # Euclidean
+                euclidean_dist = np.sqrt(np.nansum((calif_user_selected[comun_calif] - calif_user_current[comun_calif])**2))
+                self.log(euclidean_dist)
+                similarity = 1 / (1 + euclidean_dist)
                 data_corr.append([user_selected_label[4:], user[4:], round(similarity, ROUND_VALUE + 1)])
         return(data_corr)
     
