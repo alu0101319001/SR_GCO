@@ -10,8 +10,12 @@ Intento de aunar todo en forma de clase
 import argparse
 import sys
 import os
+import logging
 import numpy as np
 import pandas as pd
+
+# Configura la configuración del registro
+logging.basicConfig(filename='tracking.log', level=logging.INFO, format='%(levelname)s - %(message)s')
 
 # Visualización del dataframe
 pd.options.display.max_columns = 50
@@ -110,117 +114,163 @@ class C_F_Recommender:
                 
             self.log(self.sol_df)
             self.log('finish')
-        except Exception as error:
-            print(f'Exception: {error}')
+            
+        except Exception:
+            return ERROR
         except:
             print("Something else went wrong")
           
         
     def process_input(self):
-        self.process_input_file()
-        self.process_options()
-        self.create_utility_df()
-        self.check_min_item_rating()
-        self.find_nan_positions() 
+        try:
+            self.process_input_file()
+            self.check_utility_matrix_values()
+            self.process_options()
+            self.create_utility_df()
+            self.check_utility_df_values()
+            self.check_min_item_rating()
+            self.find_nan_positions() 
+            
+        except Exception:
+            raise
 
         
     def process_input_file(self):
         try:
+            logging.info(f'Archivo a procesar: {self.file_name}')
             with open(self.file_name, 'r') as f:
                 self.min_value = float(f.readline())
                 self.max_value = float(f.readline())
                 if self.min_value >= self.max_value:  
                     raise ValueError(f'The minimum value cannot exceed or equal the maximum value: Min({self.min_value}) - Max({self.max_value})')
             self.__utility_matrix = np.genfromtxt(self.file_name, dtype='f', delimiter=' ', skip_header=2, missing_values="-")
+            logging.info(f'Procesamiento:\nValor mínimo:{self.min_value}\nValor Máximo:{self.max_value}\nUtility Matrix:\n{self.__utility_matrix}')
+
             
         except FileNotFoundError as fnf_error:
             self.log(fnf_error)
             self.log(f"Explanation: Cannot load file {self.file_name}")
+            raise
         
     def process_options(self):
-        if self.input_metrics == 'pearson': 
-            self.norm_metrics = PEARSON
-        elif self.input_metrics == 'cosine':
-            self.norm_metrics = COSINE
-        elif self.input_metrics == 'euclidean':
-            self.norm_metrics = EUCLIDEAN
-        else:
-            self.norm_metrics = None
+        try:
+            if self.input_metrics == 'pearson': 
+                self.norm_metrics = PEARSON
+            elif self.input_metrics == 'cosine':
+                self.norm_metrics = COSINE
+            elif self.input_metrics == 'euclidean':
+                self.norm_metrics = EUCLIDEAN
+            else:
+                raise ValueError(f'The value of input_metrics {self.input_metrics} is not recognized')
+                
+            logging.info(f'Metrica escogida: {self.input_metrics} - {self.norm_metrics}')
             
-        if self.input_prediction == 'simple':
-            self.norm_prediction = SIMPLE
-        elif self.input_prediction == 'media':
-            self.norm_prediction = MEDIA
-        else:
-            self.norm_prediction = None
+            if self.input_prediction == 'simple':
+                self.norm_prediction = SIMPLE
+            elif self.input_prediction == 'media':
+                self.norm_prediction = MEDIA
+            else:
+                raise ValueError(f'The value of input_prediction {self.input_prediction} is not recognized')
+                
+            logging.info(f'Predicción escogida: {self.input_prediction} - {self.norm_prediction}')
+
+        except ValueError as ve:
+            self.log(ve)
+            self.log("Explanation: Review the values given by parameters")
+            raise
             
         
     def find_nan_positions(self):
-        self.nan_positions = np.argwhere(self.utility_df.isnull().values)
-        self.copy_nan_positions = np.array([pos for pos in self.nan_positions if pos[1] not in self.invalid_items])
+        try:
+            self.nan_positions = np.argwhere(self.utility_df.isnull().values)
+            self.copy_nan_positions = np.array([pos for pos in self.nan_positions if pos[1] not in self.invalid_items])
+        except Exception as error:
+            self.log(f'Exception in find_nan_positions: {error}')
+            raise
         
     def select_nan_to_calculate(self):
-        # Calcula el recuente de repeticiones de las filas en la lista
-        row_counter = {}
-        for pos in self.copy_nan_positions:
-            row = pos[0]
-            if row in row_counter:
-                row_counter[row] += 1
+        try:
+            # Calcula el recuente de repeticiones de las filas en la lista
+            row_counter = {}
+            for pos in self.copy_nan_positions:
+                row = pos[0]
+                if row in row_counter:
+                    row_counter[row] += 1
+                else:
+                    row_counter[row] = 1
+            
+            # Encontrar el mínimo recuento de repeticiones de filas
+            min_row_counted = min(row_counter.values())
+            
+            # Filtrar las filas con el mínimo recuento de repeticiones de filas
+            preselect = [pos for pos in self.copy_nan_positions if row_counter[pos[0]] == min_row_counted]
+            
+            if len(preselect) == 0:
+                raise Exception(f'No unknow value to choose is viable. Preselect: {preselect}')
+                
+            if len(preselect) == 1:
+                self.nan_selected = preselect[0]
+                self.copy_nan_positions = self.copy_nan_positions[~np.all(self.copy_nan_positions == self.nan_selected, axis=1)]
+                return
+            
+            # Calcular el recuento de repeticiones de columnas en la lista completa
+            col_counter = {}
+            for pos in self.copy_nan_positions:
+                col = pos[1]
+                if col in col_counter:
+                    col_counter[col] += 1
+                else:
+                    col_counter[col] = 1
+          
+            # Encontrar el mínimo recuento de repeticiones de columnas en la lista completa
+            min_col_counted = min(col_counter.values())
+          
+            # Filtrar las posiciones con el mínimo recuento de repeticiones de columnas en la preselección
+            selection = [pos for pos in preselect if col_counter[pos[1]] == min_col_counted]
+          
+            if selection:
+                # Si hay resultados en la selección, elige el primero
+                self.nan_selected = np.array(selection[0])
             else:
-                row_counter[row] = 1
-        
-        # Encontrar el mínimo recuento de repeticiones de filas
-        min_row_counted = min(row_counter.values())
-        
-        # Filtrar las filas con el mínimo recuente de repeticiones de filas
-        preselect = [pos for pos in self.copy_nan_positions if row_counter[pos[0]] == min_row_counted]
-        
-        if len(preselect) == 1:
-            self.nan_selected = preselect[0]
+                # Si no hay resultados, elige el primero de la preselección
+                self.nan_selected = preselect[0]
+          
+            # Eliminamos la posición seleccionada de la lista
             self.copy_nan_positions = self.copy_nan_positions[~np.all(self.copy_nan_positions == self.nan_selected, axis=1)]
-            return
-        # Calcular el recuento de repeticiones de columnas en la lista completa
-        col_counter = {}
-        for pos in self.copy_nan_positions:
-            col = pos[1]
-            if col in col_counter:
-                col_counter[col] += 1
-            else:
-                col_counter[col] = 1
-      
-        # Encontrar el mínimo recuento de repeticiones de columnas en la lista completa
-        min_col_counted = min(col_counter.values())
-      
-        # Filtrar las posiciones con el mínimo recuento de repeticiones de columnas en la preselección
-        selection = [pos for pos in preselect if col_counter[pos[1]] == min_col_counted]
-      
-        if selection:
-            # Si hay resultados en la selección, elige el primero
-            self.nan_selected = np.array(selection[0])
-        else:
-            # Si no hay resultados, elige el primero de la preselección
-            self.nan_selected = preselect[0]
-      
-        # Eliminamos la posición seleccionada de la lista
-        self.copy_nan_positions = self.copy_nan_positions[~np.all(self.copy_nan_positions == self.nan_selected, axis=1)]
+            
+        except Exception as error:
+            self.log(f'Exception in select_nan_to_calculate: {error}')
+            raise
        
     def calculate_similarity(self):
-        if self.norm_metrics == PEARSON:
-            data_corr = self.pearson()
-        elif self.norm_metrics == COSINE:
-            data_corr = self.cosine()
-        elif self.norm_metrics == EUCLIDEAN:
-            data_corr = self.euclidean()
-        else:
-            # Error
-            return -1
-        self.create_sim_df(data_corr)
+        try:
+            if self.norm_metrics == PEARSON:
+                data_corr = self.pearson()
+            elif self.norm_metrics == COSINE:
+                data_corr = self.cosine()
+            elif self.norm_metrics == EUCLIDEAN:
+                data_corr = self.euclidean()
+            else:
+                raise ValueError(f'The value of metrics {self.norm_metrics} is not recognized')
+                
+            self.create_sim_df(data_corr)
+            
+        except ValueError as ve:
+            self.log(f'Exception in calculate_similarity: {ve}')
+            self.log('Explanation: Something happened in the normalization of metrics')
+            raise
+        except Exception:
+            raise
         
     def select_neighbors(self): 
         eliminate_sim = []
         for sim in self.sim_df.index:
             user_label = "User" + str(self.sim_df.at[sim, CORR_COL_1])
+            # Elimina aquellos usuarios que no han valorado el item en cuestión
             if pd.isna(self.utility_df.at[user_label, self.utility_df.columns[self.nan_selected[1]]]):
+                eliminate_sim.append(sim)
+            # Elimina aquellas similitudes con valor negativo o 0
+            elif self.sim_df.at[sim, CORR_COL_2] <= 0:
                 eliminate_sim.append(sim)
         sim_df_copy = self.sim_df.drop(index = eliminate_sim)
         self.neighbors_selected = sim_df_copy.nlargest(self.neighbors, CORR_COL_2)
@@ -244,19 +294,26 @@ class C_F_Recommender:
         
 ### MÉTRICAS DE SIMILITUD ###
     def pearson(self):
-        data_corr = []
-        user_selected_label = self.utility_df.index[self.nan_selected[0]]
-        calif_user_selected = self.utility_df.loc[user_selected_label].dropna()
-        for user in self.utility_df.index:
-            if user != user_selected_label:
-                calif_user_current = self.utility_df.loc[user].dropna()
-                comun_calif = calif_user_selected.index.intersection(calif_user_current.index)
-                
-                # Pearson
-                if len(comun_calif) > 1:
-                    corr = np.corrcoef(calif_user_selected[comun_calif], calif_user_current[comun_calif])[0, 1]
-                    data_corr.append([user_selected_label[4:], user[4:], round(corr, ROUND_VALUE + 1)])
-        return(data_corr)
+        try:
+            data_corr = []
+            user_selected_label = self.utility_df.index[self.nan_selected[0]]
+            calif_user_selected = self.utility_df.loc[user_selected_label].dropna()
+            for user in self.utility_df.index:
+                if user != user_selected_label:
+                    calif_user_current = self.utility_df.loc[user].dropna()
+                    comun_calif = calif_user_selected.index.intersection(calif_user_current.index)
+                    
+                    # Pearson
+                    if len(comun_calif) > 1:
+                        corr = np.corrcoef(calif_user_selected[comun_calif], calif_user_current[comun_calif])[0, 1]
+                        data_corr.append([user_selected_label[4:], user[4:], round(corr, ROUND_VALUE + 1)])
+                    else:
+                        logging.warning(f'There are no common qualifications with which to calculate the correlation value: u:{user_selected_label} - v:{user} - Comun:{comun_calif}')
+            return(data_corr)
+        
+        except Exception as error:
+            self.log(f'Exception in pearson: {error}')
+            raise
     
     def cosine(self):
         data_corr = []
@@ -341,6 +398,8 @@ class C_F_Recommender:
         new_index_name = [f'User{j}' for j in range(self.num_rows)]
         self.utility_df.index = new_index_name
         
+        logging.info(f'Utility_df creada {self.num_col}x{self.num_rows}:\n{self.utility_df}')
+        
     def create_sim_df(self, data_corr):
         self.sim_df = pd.DataFrame(data_corr)
         # Generar los nombres de las filas automáticamente basados en los valores de las columnas 1 y 2
@@ -392,13 +451,28 @@ class C_F_Recommender:
 ### CONTROL DE ERRORES
     def check_utility_matrix_values(self):
         try:
-            check = np.all((self.__utility_matrix >= self.min_value) 
-                           & (self.__utility_matrix <= self.max_value))
+            check = np.all((np.isnan(self.__utility_matrix) | 
+                             ((self.__utility_matrix >= self.min_value) 
+                              & (self.__utility_matrix <= self.max_value))))
             if not check:
-                 raise ValueError('Not all values ​​in the utility matrix are within the set range. Check the file input data.')
-        except ValueError as e:
-            print(f'Explanation: {e}')
-             
+                 raise ValueError(f'Not all values ​​in the utility matrix are within the set range:\n{self.__utility_matrix}')
+        except ValueError as ve:
+            self.log(f'Exception in check_utility_matrix_values: {ve}')
+            self.log('Explanation: Check the file input data.')
+            raise
+    
+    def check_utility_df_values(self):
+        try:
+            check = np.all((np.isnan(self.utility_df) | 
+                             ((self.utility_df >= 0.0) 
+                              & (self.utility_df <= 1.0))))
+            if not check:
+                 raise ValueError(f'Not all values ​​in the utility dataframe are normalized:\n{self.utility_df}')
+        except ValueError as ve:
+            self.log(f'Exception in check_utility_df_values: {ve}')
+            self.log('Explanation: Something went wrong in normalization process.')
+            raise
+         
         
         
         
