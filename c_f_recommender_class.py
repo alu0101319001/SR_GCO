@@ -35,10 +35,13 @@ CORR_COL_0 = "u"
 CORR_COL_1 = "v"
 CORR_COL_2 = "sim"
 ROUND_VALUE = 2
-MIN_NEIGHBORS = 2
+MIN_NEIGHBORS = 1
 SOL_COL_0 = 'NaN_Pos'
-SOL_COL_1 = 'Sol_Val'
-SOL_COL_2 = 'Desn_Sol_Val'
+SOL_COL_1 = 'User'
+SOL_COL_2 = 'Sol_Val'
+SOL_COL_3 = 'Desn_Val'
+SOL_COL_4 = 'Neighbors_Selected'
+
 
 # La clase que recoje el proceso de un recomendador por el método de filtro colaborativo
 class C_F_Recommender:
@@ -75,13 +78,20 @@ class C_F_Recommender:
         self.sol_val = None
         # Se inicializa vacía y se van añadiendo sol cada ciclo
         self.sol_df = None
+        # Usados para la visualización final
+        self.complete_sim_df = None
+        # Control de errores
+        self.not_valid = False
+
 
     def start(self):
         try:
             self.restore_output_file()
             # Procesa toda la información de entrada y crea la estructura inicial de datos
-            self.process_input()
+            if not self.process_input():
+                return
             self.create_sol_df()
+            self.create_complete_sim_df()
     
             self.log(self.utility_df)
             self.log(self.nan_positions)
@@ -89,37 +99,94 @@ class C_F_Recommender:
             self.log(self.copy_nan_positions)
             # Empieza el ciclo
             while self.copy_nan_positions.size > 0:
+                # Restablece not_valid
+                self.not_valid = False
                 # Selecciona el NaN a calcular
                 self.select_nan_to_calculate()
                 self.log(self.nan_selected)
                 # Calcula la similaridad
                 self.calculate_similarity()
                 self.log(self.sim_df)
+                # Añade al df con la similaridad completa
+                self.add_sims()
                 # Selecciona vecinos
                 self.select_neighbors()
+                # Si no existen vecinos suficientes, no es posible resolver el valor
+                if len(self.neighbors_selected) < self.neighbors:
+                    
+                    if len(self.neighbors_selected) < MIN_NEIGHBORS:
+                        self.log(f'There are not enough viable neighbors to predict: Min: {MIN_NEIGHBORS} - Valid: {len(self.neighbors_selected)}')
+                        self.incalculable_nan_value()
+                        continue
+                    else:
+                        self.log(f'There are not enough neighbors as those considered, but the minimum is met: Considered: {self.neighbors} - Valid: {len(self.neighbors_selected)}')
+                        self.log('The value will be calculated with the available neighbors, but will not be considered a valid value to add to the utility dataframe.')
+                        self.not_valid = True
+                        
                 self.log(self.neighbors_selected)
                 # Calcula la predicción
                 self.calcualte_prediction()
+                self.limit_sol_val()
                 sol = "Valor: " + str(self.sol_val)
                 sol += " | Valor Desnormalizado: " + str(self.desnormalizar(self.sol_val))
                 self.log(sol)
-                # Añade la solución
-                self.add_solution()
-                # Decisión: usar valores de NaN calculados o no?
-                if self.use_calculated_nan:
-                    self.add_calculated_NaN()
-                    self.log("NUEVA UTILITY DF")
-                    self.log(self.utility_df)
-                    
                 
-            self.log(self.sol_df)
-            self.log('finish')
+                self.add_solution()
+                
+                if self.not_valid == False:
+                    # Decisión: usar valores de NaN calculados o no?
+                    if self.use_calculated_nan:
+                        self.add_calculated_NaN()
+                        self.log("NUEVA UTILITY DF")
+                        self.log(self.utility_df)
+                    
+            self.log('FINISH START')  
+            if self.nan_positions != self.incalculable_nan_list():
+                self.recalculate()
+            
+            self.log('REALLY FINISH')
+            return
             
         except Exception:
             return ERROR
         except:
             print("Something else went wrong")
           
+    def recalculate(self):
+        try:
+            self.check_min_item_rating()
+            if not self.find_nan_positions():
+                return # END OF ALL
+            while self.copy_nan_positions.size > 0:
+                self.not_valid = False
+                self.select_nan_to_calculate()
+                self.calculate_similarity()
+                self.add_sims()
+                self.select_neighbors()
+                if len(self.neighbors_selected) < self.neighbors:
+                    if len(self.neighbors_selected) < MIN_NEIGHBORS:
+                        self.log(f'There are not enough viable neighbors to predict: Min: {MIN_NEIGHBORS} - Valid: {len(self.neighbors_selected)}')
+                        self.incalculable_nan_value()
+                        continue
+                    else:
+                        self.log(f'There are not enough neighbors as those considered, but the minimum is met: Considered: {self.neighbors} - Valid: {len(self.neighbors_selected)}')
+                        self.log('The value will be calculated with the available neighbors, but will not be considered a valid value to add to the utility dataframe.')
+                        self.not_valid = True
+                self.calcualte_prediction()
+                self.limit_sol_val()
+                self.add_solution()
+            if self.nan_positions != self.incalculable_nan_list():
+                self.recalculate()
+            
+            self.log(self.complete_sim_df)
+            self.log(self.sol_df)
+            self.incalculable_nan_list()
+            self.log(self.utility_df)
+            self.log('finish')
+            return # END OF ALL
+        
+        except Exception:
+            raise
         
     def process_input(self):
         try:
@@ -129,7 +196,9 @@ class C_F_Recommender:
             self.create_utility_df()
             self.check_utility_df_values()
             self.check_min_item_rating()
-            self.find_nan_positions() 
+            if not self.find_nan_positions():
+                return False
+            return True
             
         except Exception:
             raise
@@ -183,7 +252,15 @@ class C_F_Recommender:
     def find_nan_positions(self):
         try:
             self.nan_positions = np.argwhere(self.utility_df.isnull().values)
+            if len(self.nan_positions) == 0:
+                return False
+            
             self.copy_nan_positions = np.array([pos for pos in self.nan_positions if pos[1] not in self.invalid_items])
+            if len(self.copy_nan_positions) == 0:
+                return False
+            
+            return True
+        
         except Exception as error:
             self.log(f'Exception in find_nan_positions: {error}')
             raise
@@ -263,34 +340,35 @@ class C_F_Recommender:
             raise
         
     def select_neighbors(self): 
+        self.neighbors_selected = []
         eliminate_sim = []
         for sim in self.sim_df.index:
             user_label = "User" + str(self.sim_df.at[sim, CORR_COL_1])
             # Elimina aquellos usuarios que no han valorado el item en cuestión
             if pd.isna(self.utility_df.at[user_label, self.utility_df.columns[self.nan_selected[1]]]):
                 eliminate_sim.append(sim)
-            # Elimina aquellas similitudes con valor negativo o 0
-            elif self.sim_df.at[sim, CORR_COL_2] <= 0:
+            # Elimina aquellas similitudes con valor negativo, 0 o NaN
+            elif ((self.sim_df.at[sim, CORR_COL_2] <= 0) | (np.isnan(self.sim_df.at[sim, CORR_COL_2]))):
                 eliminate_sim.append(sim)
         sim_df_copy = self.sim_df.drop(index = eliminate_sim)
         self.neighbors_selected = sim_df_copy.nlargest(self.neighbors, CORR_COL_2)
         
     def calcualte_prediction(self):
-        if self.norm_prediction == SIMPLE:
-            self.simple_prediction()
-        elif self.norm_prediction == MEDIA:
-            self.media_prediction()
-        else:
-            # Error
-            return None
+        try:
+            if self.norm_prediction == SIMPLE:
+                self.simple_prediction()
+            elif self.norm_prediction == MEDIA:
+                self.media_prediction()
+            else:
+                raise ValueError(f'The value of prediction {self.norm_prediction} is not recognized')
+                
+        except ValueError as ve:
+            self.log(f'Exception in calculate_prediction: {ve}')
+            self.log('Explanation: Something happened in the normalization of prediction')
+            raise
+        except Exception:
+            raise
         
-    def check_min_item_rating(self):
-        self.invalid_items = []
-        for item in self.utility_df.columns:
-            non_nan_values = self.utility_df[item].dropna()
-            if len(non_nan_values) < MIN_NEIGHBORS:
-                self.invalid_items.append(int(item[4:]))
-
         
 ### MÉTRICAS DE SIMILITUD ###
     def pearson(self):
@@ -400,6 +478,23 @@ class C_F_Recommender:
         
         logging.info(f'Utility_df creada {self.num_col}x{self.num_rows}:\n{self.utility_df}')
         
+    def add_calculated_NaN(self):
+        # Actualiza el valor en utility_df
+        user_index = self.utility_df.index[self.nan_selected[0]]
+        item_column = self.utility_df.columns[self.nan_selected[1]]
+        self.utility_df.at[user_index, item_column] = self.sol_val
+    
+    def add_solution_values_to_utility_df(self):
+        try:
+            for index, row in self.sol_df.iterrows():
+                if((row[SOL_COL_2] != np.nan) & (len(row[4]) >= self.neighbors)):
+                    self.utility_df.at[row[SOL_COL_0][0], row[SOL_COL_0][1]] = row[SOL_COL_2]
+            
+        except Exception as error:
+            self.log(f'Exception in add_solution_values: {error}')
+            raise
+        
+        
     def create_sim_df(self, data_corr):
         self.sim_df = pd.DataFrame(data_corr)
         # Generar los nombres de las filas automáticamente basados en los valores de las columnas 1 y 2
@@ -411,20 +506,79 @@ class C_F_Recommender:
         self.sim_df.columns = new_column_names
         
     def create_sol_df(self):
-        col = [SOL_COL_0, SOL_COL_1, SOL_COL_2]
-        self.sol_df = pd.DataFrame(columns=col)
-        
-                        
+        try:
+            col = [SOL_COL_0, SOL_COL_1, SOL_COL_2, SOL_COL_3, SOL_COL_4]
+            self.sol_df = pd.DataFrame(columns=col)
+        except Exception as error:
+            self.log(f'Exception in create_sol_df: {error}')
+            raise
+       
+                       
     def add_solution(self):
-        temp_df = pd.DataFrame([[self.nan_selected, self.sol_val, self.desnormalizar(self.sol_val)]],
-                               columns=[SOL_COL_0, SOL_COL_1, SOL_COL_2])
-        self.sol_df = pd.concat([self.sol_df, temp_df], ignore_index=True)
+        try:
+            if self.not_valid:
+                value = str(self.sol_val) + '*'
+            else:
+                value = np.float32(self.sol_val)
+            
+            for index, row in self.sol_df.iterrows():
+                if np.array_equal(row[SOL_COL_0], self.nan_selected):
+                    self.sol_df.at[index, SOL_COL_2] = value
+                    self.sol_df.at[index, SOL_COL_3] = self.desnormalizar(self.sol_val)
+                    self.sol_df.at[index, SOL_COL_4] = self.list_neighbors_selected()
+                    return
+                
+            list_neighbors_selected = self.list_neighbors_selected()
+            user_selected = 'User' + str(self.nan_selected[0])
+            
+            temp_df = pd.DataFrame([[self.nan_selected, user_selected, value, self.desnormalizar(self.sol_val), list_neighbors_selected]],
+                                   columns=[SOL_COL_0, SOL_COL_1, SOL_COL_2, SOL_COL_3, SOL_COL_4])
+            
+            if self.sol_df.empty:
+                self.sol_df = temp_df
+            else:
+                self.sol_df = pd.concat([self.sol_df, temp_df], ignore_index=True)
+                
+        except Exception as error:
+            self.log(f'Exception in add_solution: {error}')
+            raise
         
-    def add_calculated_NaN(self):
-        # Actualiza el valor en utility_df
-        user_index = self.utility_df.index[self.nan_selected[0]]
-        item_column = self.utility_df.columns[self.nan_selected[1]]
-        self.utility_df.at[user_index, item_column] = self.sol_val
+    def list_neighbors_selected(self):
+        try:
+            list_neighbors_selected = []
+            for index, sim in self.neighbors_selected.iterrows():
+                list_neighbors_selected.append(sim[CORR_COL_1])
+            return list_neighbors_selected
+        
+        except Exception as error:
+            self.log(f'Exception in list_neighbors_selected: {error}')
+            raise
+    
+    def create_complete_sim_df(self):
+        try:
+            name_col_row = [f'User{j}' for j in range(self.num_rows)]
+            self.complete_sim_df = pd.DataFrame(index=name_col_row, columns=name_col_row)
+            
+            for i in range(self.num_rows):
+                self.complete_sim_df.at[f'User{i}', f'User{i}'] = '#'
+                            
+        except Exception as error:
+            self.log(f'Exception in create_complete_sim_df: {error}')
+            raise
+    
+    def add_sims(self):
+        try:
+            user_u = self.sim_df.iloc[0,0]
+            user_u_label = 'User' + user_u
+            for index, row in self.sim_df.iterrows():
+                user_v = row[CORR_COL_1]
+                user_v_label = 'User' + user_v
+                self.complete_sim_df.at[user_u_label, user_v_label] = row[CORR_COL_2]
+                
+        except Exception as error:
+            self.log(f'Exception in add_sims: {error}')
+            raise
+    
     
 ### NORMALIZACION ###
     # Normaliza los valores entre 0 y 1
@@ -471,6 +625,48 @@ class C_F_Recommender:
         except ValueError as ve:
             self.log(f'Exception in check_utility_df_values: {ve}')
             self.log('Explanation: Something went wrong in normalization process.')
+            raise
+            
+    def check_min_item_rating(self):
+        self.invalid_items = []
+        for item in self.utility_df.columns:
+            non_nan_values = self.utility_df[item].dropna()
+            if len(non_nan_values) < MIN_NEIGHBORS:
+                self.invalid_items.append(int(item[4:]))
+                
+                
+    def limit_sol_val(self):
+        try:
+            if self.sol_val < 0.0:
+                self.sol_val = 0.0
+            elif self.sol_val > 1.0:
+                self.sol_val = 1.0
+            return self.sol_val
+        
+        except Exception as error:
+            self.log(f'Exception in limit_sol_val: {error}')
+            raise
+    
+    def incalculable_nan_value(self):
+        try:
+            self.sol_val = np.nan
+            self.add_solution()
+            
+        except Exception as error:
+            self.log(f'Exception in incalculable_nan_value: {error}')
+            raise
+            
+    def incalculable_nan_list(self):
+        try:
+            # incalculable_nan_list = self.invalid_items
+            if not self.use_calculated_nan:
+                self.add_solution_values_to_utility_df()
+            
+            new_nan_positions = np.argwhere(self.utility_df.isnull().values)
+            return new_nan_positions
+                               
+        except Exception as error:
+            self.log(f'Exception en incalculable_nan_list: {error}')
             raise
          
         
