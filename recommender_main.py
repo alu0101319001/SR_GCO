@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import pandas as pd
 import c_f_recommender_class as cfrc
+import c_f_recommender_class_with_log as cfrc_lg
 
 parser = argparse.ArgumentParser()
 
@@ -30,5 +31,7 @@ prediction: str = args.prediction
 output: str = args.output
 use_nan = args.use_nan
 
-test = cfrc.C_F_Recommender(file_name, metrics, neighbors, prediction, output, use_nan)
+# test = cfrc.C_F_Recommender(file_name, metrics, neighbors, prediction, output, use_nan)
+test = cfrc_lg.C_F_Recommender(file_name, metrics, neighbors, prediction, output, use_nan)
 test.start()
+
