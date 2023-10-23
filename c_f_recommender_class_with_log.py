@@ -4,7 +4,7 @@ Created on Sat Oct 14 18:59:24 2023
 
 @author: eduar
 
-Intento de aunar todo en forma de clase
+Clase para gestionar todo el proceso del método de filtrado colaborativo
 """
 
 import argparse
