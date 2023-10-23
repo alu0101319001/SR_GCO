@@ -13,14 +13,13 @@ import os
 import logging
 import numpy as np
 import pandas as pd
+import openpyxl as oxl
 
 # Configura la configuración del registro
 logging.basicConfig(filename='tracking.log', level=logging.INFO, filemode='w',format='%(message)s')
 
 # Visualización del dataframe
-pd.options.display.max_columns = 50
 pd.options.display.max_columns = None
-pd.options.display.max_rows = 50
 pd.options.display.max_rows = None
 
 # Constantes de selección y error
@@ -41,21 +40,20 @@ SOL_COL_1 = 'User'
 SOL_COL_2 = 'Sol_Val'
 SOL_COL_3 = 'Desn_Val'
 SOL_COL_4 = 'Neighbors_Selected'
+RESULT_XLSX = 'results.xlsx'
 
 
 # La clase que recoje el proceso de un recomendador por el método de filtro colaborativo
 class C_F_Recommender:
     
     # Inicializador de la clase - parámetros de entrada
-    def __init__(self, file_name, metrics, neighbors, prediction, 
-                 output_mode="console", use_calculated_nan=True):
+    def __init__(self, file_name, metrics, neighbors, prediction, use_calculated_nan=True):
         # Atributos de la clase
         # Se dan como parámetros de creación
         self.file_name = file_name
         self.input_metrics = metrics
         self.neighbors = neighbors
         self.input_prediction  = prediction   
-        self.output_mode = output_mode
         self.use_calculated_nan = use_calculated_nan
         # Se asginan en esta inicialización
         self.output_file = file_name.replace(".txt", "_output.txt")
@@ -88,17 +86,12 @@ class C_F_Recommender:
 
     def start(self):
         try:
-            self.restore_output_file()
             # Procesa toda la información de entrada y crea la estructura inicial de datos
             if not self.process_input():
                 return
             self.create_sol_df()
             self.create_complete_sim_df()
     
-            self.log(self.utility_df)
-            self.log(self.nan_positions)
-            self.log(self.invalid_items)
-            self.log(self.copy_nan_positions)
             # Empieza el ciclo
             count = 0
             logging.info('### START ###')
@@ -109,10 +102,8 @@ class C_F_Recommender:
                 self.not_valid = False
                 # Selecciona el NaN a calcular
                 self.select_nan_to_calculate()
-                self.log(self.nan_selected)
                 # Calcula la similaridad
                 self.calculate_similarity()
-                self.log(self.sim_df)
                 # Añade al df con la similaridad completa
                 self.add_sims()
                 # Selecciona vecinos
@@ -129,13 +120,8 @@ class C_F_Recommender:
                         logging.warning('The value will be calculated with the available neighbors, but will not be considered a valid value to add to the utility dataframe.')
                         self.not_valid = True
                         
-                self.log(self.neighbors_selected)
                 # Calcula la predicción
                 self.calcualte_prediction()
-                sol = "Valor: " + str(self.sol_val)
-                sol += " | Valor Desnormalizado: " + str(self.desnormalizar(self.sol_val))
-                self.log(sol)
-                
                 self.add_solution()
                 
                 if self.not_valid == False:
@@ -143,12 +129,9 @@ class C_F_Recommender:
                     if self.use_calculated_nan:
                         logging.info('Sol_Val added to utility_df for calculate the new nan_pos')
                         self.add_calculated_NaN()
-                        self.log("NUEVA UTILITY DF")
-                        self.log(self.utility_df)
                     else:
                         logging.info('Sol_Val will not be added to utility_df for calculate new nan_pos')
                     
-            self.log('FINISH START') 
             self.incalculable_nan_list()
             logging.info('#### FINISH START ####\n')
             logging.info(f'-- Complete Sim DF --\n{self.complete_sim_df}')
@@ -160,8 +143,14 @@ class C_F_Recommender:
                 logging.info('### GO RECALCULATE ###')
                 self.recalculate()
             
-            self.log('REALLY FINISH')
-            return
+            logging.info('### FINAL RESULT ###')
+            logging.info(f'-- Complete Sim DF --\n{self.complete_sim_df}')
+            logging.info(f'-- Solution DF --\n{self.sol_df}')
+            logging.info(f'-- Utility DF --\n{self.utility_df}\n')
+            logging.info('#### FINISH ALL ####\n')
+            self.final_console_output()
+            self.final_xlsx_output()
+            return [self.utility_df, self.complete_sim_df, self.sol_df]
             
         except Exception:
             return ERROR
@@ -172,7 +161,9 @@ class C_F_Recommender:
         try:
             self.check_min_item_rating()
             if not self.find_nan_positions():
-                return # END OF ALL
+                self.incalculable_nan_list()
+                logging.info('### FINISH RECALCULATE - Not nan_pos ###')
+                return # END OF RECALCULATE
             count = 0
             while self.copy_nan_positions.size > 0:
                 logging.info(f'---> Ciclo {count}')
@@ -192,8 +183,14 @@ class C_F_Recommender:
                         logging.warning('The value will be calculated with the available neighbors, but will not be considered a valid value to add to the utility dataframe.')
                         self.not_valid = True
                 self.calcualte_prediction()
-                self.limit_sol_val()
                 self.add_solution()
+                if self.not_valid == False:
+                    # Decisión: usar valores de NaN calculados o no?
+                    if self.use_calculated_nan:
+                        logging.info('Sol_Val added to utility_df for calculate the new nan_pos')
+                        self.add_calculated_NaN()
+                    else:
+                        logging.info('Sol_Val will not be added to utility_df for calculate new nan_pos')
                 self.incalculable_nan_list()
             logging.info('#### FINISH RECALCULATE ####\n')
             logging.info(f'-- Complete Sim DF --\n{self.complete_sim_df}')
@@ -205,18 +202,9 @@ class C_F_Recommender:
                 logging.info('### GO RECALCULATE ###')
                 self.recalculate()
             
-            logging.info('### FINAL RESULT ###')
-
-            self.log(self.complete_sim_df)
-            self.log(self.sol_df)
             self.incalculable_nan_list()
-            self.log(self.utility_df)
-            logging.info(f'-- Complete Sim DF --\n{self.complete_sim_df}')
-            logging.info(f'-- Solution DF --\n{self.sol_df}')
-            logging.info(f'-- Utility DF --\n{self.utility_df}\n')
-            logging.info('#### FINISH ALL ####\n')
-            self.log('finish')
-            return # END OF ALL
+            logging.info('### FINISH RECALCULATE - ending ###')
+            return # END OF RECALCULATE
         
         except Exception:
             raise
@@ -250,8 +238,8 @@ class C_F_Recommender:
 
             
         except FileNotFoundError as fnf_error:
-            self.log(fnf_error)
-            self.log(f"Explanation: Cannot load file {self.file_name}")
+            print(fnf_error)
+            print(f"Explanation: Cannot load file {self.file_name}")
             raise
         
     def process_options(self):
@@ -277,8 +265,8 @@ class C_F_Recommender:
             logging.info(f'Predicción escogida: {self.input_prediction} - {self.norm_prediction}')
 
         except ValueError as ve:
-            self.log(ve)
-            self.log("Explanation: Review the values given by parameters")
+            print(ve)
+            print("Explanation: Review the values given by parameters")
             raise
             
         
@@ -299,7 +287,7 @@ class C_F_Recommender:
             return True
         
         except Exception as error:
-            self.log(f'Exception in find_nan_positions: {error}')
+            print(f'Exception in find_nan_positions: {error}')
             raise
         
     def select_nan_to_calculate(self):
@@ -355,7 +343,7 @@ class C_F_Recommender:
             logging.info(f'NaN selected --> {self.nan_selected}')
             
         except Exception as error:
-            self.log(f'Exception in select_nan_to_calculate: {error}')
+            print(f'Exception in select_nan_to_calculate: {error}')
             raise
        
     def calculate_similarity(self):
@@ -373,8 +361,8 @@ class C_F_Recommender:
             logging.info(f' -- Similarity Calculated --\n{self.sim_df}')
             
         except ValueError as ve:
-            self.log(f'Exception in calculate_similarity: {ve}')
-            self.log('Explanation: Something happened in the normalization of metrics')
+            print(f'Exception in calculate_similarity: {ve}')
+            print('Explanation: Something happened in the normalization of metrics')
             raise
         except Exception:
             raise
@@ -398,7 +386,7 @@ class C_F_Recommender:
             logging.info(f' -- Neighbors Selected --\n{self.neighbors_selected}')
         
         except Exception as error:
-            self.log(f'Exception in select_neighbors: {error}')
+            print(f'Exception in select_neighbors: {error}')
             raise
         
     def calcualte_prediction(self):
@@ -411,8 +399,8 @@ class C_F_Recommender:
                 raise ValueError(f'The value of prediction {self.norm_prediction} is not recognized')
                 
         except ValueError as ve:
-            self.log(f'Exception in calculate_prediction: {ve}')
-            self.log('Explanation: Something happened in the normalization of prediction')
+            print(f'Exception in calculate_prediction: {ve}')
+            print('Explanation: Something happened in the normalization of prediction')
             raise
         except Exception:
             raise
@@ -435,10 +423,12 @@ class C_F_Recommender:
                         data_corr.append([user_selected_label[4:], user[4:], round(corr, ROUND_VALUE + 1)])
                     else:
                         logging.warning(f'There are no common qualifications with which to calculate the correlation value: u:{user_selected_label} - v:{user} - Comun:{comun_calif}')
+                        corr = np.nan
+                        data_corr.append([user_selected_label[4:], user[4:], corr])
             return(data_corr)
         
         except Exception as error:
-            self.log(f'Exception in pearson: {error}')
+            print(f'Exception in pearson: {error}')
             raise
     
     def cosine(self):
@@ -459,14 +449,16 @@ class C_F_Recommender:
                     norm_user_current = np.linalg.norm(calif_user_current[comun_calif])
                     # Evita divisiones por cero
                     if norm_user_selected == 0 or norm_user_current == 0:
-                        return 0.0
+                        similarity = np.nan
+                        data_corr.append([user_selected_label[4:], user[4:], similarity])
+                        return(data_corr)
                     # Calcula la similitud del coseno
                     similarity = dot_product / (norm_user_selected * norm_user_current)
                     data_corr.append([user_selected_label[4:], user[4:], round(similarity, ROUND_VALUE + 1)])
             return(data_corr)
         
         except Exception as error:
-            self.log(f'Exception in cosine: {error}')
+            print(f'Exception in cosine: {error}')
             raise
     
     def euclidean(self):
@@ -481,13 +473,12 @@ class C_F_Recommender:
                     
                     # Euclidean
                     euclidean_dist = np.sqrt(np.nansum((calif_user_selected[comun_calif] - calif_user_current[comun_calif])**2))
-                    self.log(euclidean_dist)
                     similarity = 1 / (1 + euclidean_dist)
                     data_corr.append([user_selected_label[4:], user[4:], round(similarity, ROUND_VALUE + 1)])
             return(data_corr)
         
         except Exception as error:
-            self.log(f'Exception in euclidean: {error}')
+            print(f'Exception in euclidean: {error}')
             raise
     
 ### CALCULO DE PREDICCIONES ###
@@ -508,7 +499,7 @@ class C_F_Recommender:
             logging.info(f': : Sol_Val calculated by simple prediction: {self.sol_val} - {self.desnormalizar(self.sol_val)}')
             
         except Exception as error:
-            self.log(f'Exception in simple_prediction: {error}')
+            print(f'Exception in simple_prediction: {error}')
             raise
         
         
@@ -534,59 +525,77 @@ class C_F_Recommender:
 
         
         except Exception as error:
-            self.log(f'Exception in media_prediction: {error}')
+            print(f'Exception in media_prediction: {error}')
             raise
         
         
 ### CREACIONES y MODIFICACIONES DE DATAFRAMES ####
     def create_utility_df(self):
-        normalized_matrix = self.normalizar(self.__utility_matrix)
+        try:
+            normalized_matrix = self.normalizar(self.__utility_matrix)
+            
+            self.utility_df = pd.DataFrame(normalized_matrix)
+            self.num_col = len(self.utility_df.columns)
+            self.num_rows = len(self.utility_df.index) 
+            
+            new_columns_names = [f'Item{i}' for i in range(self.num_col)]
+            self.utility_df.columns = new_columns_names
+            
+            new_index_name = [f'User{j}' for j in range(self.num_rows)]
+            self.utility_df.index = new_index_name
+            
+            logging.info(f'-- Utility_df creada {self.num_col}x{self.num_rows} --\n{self.utility_df}')
         
-        self.utility_df = pd.DataFrame(normalized_matrix)
-        self.num_col = len(self.utility_df.columns)
-        self.num_rows = len(self.utility_df.index) 
-        
-        new_columns_names = [f'Item{i}' for i in range(self.num_col)]
-        self.utility_df.columns = new_columns_names
-        
-        new_index_name = [f'User{j}' for j in range(self.num_rows)]
-        self.utility_df.index = new_index_name
-        
-        logging.info(f'-- Utility_df creada {self.num_col}x{self.num_rows} --\n{self.utility_df}')
+        except Exception as error:
+            print(f'Exception in create_utility_df: {error}')
+            raise
         
     def add_calculated_NaN(self):
-        # Actualiza el valor en utility_df
-        user_index = self.utility_df.index[self.nan_selected[0]]
-        item_column = self.utility_df.columns[self.nan_selected[1]]
-        self.utility_df.at[user_index, item_column] = self.sol_val
+        try:
+            # Actualiza el valor en utility_df
+            user_index = self.utility_df.index[self.nan_selected[0]]
+            item_column = self.utility_df.columns[self.nan_selected[1]]
+            self.utility_df.at[user_index, item_column] = np.float32(self.sol_val)
+
+        except Exception as error:
+            print(f'Exception in add_calculated_NaN: {error}')
+            raise
     
     def add_solution_values_to_utility_df(self):
         try:
             for index, row in self.sol_df.iterrows():
-                if((row[SOL_COL_2] != np.nan) & (len(row[4]) >= self.neighbors)):
-                    self.utility_df.at[row[SOL_COL_0][0], row[SOL_COL_0][1]] = row[SOL_COL_2]
+                if((row[SOL_COL_2] != np.nan) & (len(row[SOL_COL_4]) >= self.neighbors)):
+                    nan_pos = row[SOL_COL_0]
+                    user = "User" + str(nan_pos[0])
+                    item = "Item" + str(nan_pos[1])
+                    value = np.float32(row[SOL_COL_2])
+                    self.utility_df.at[user, item] = value
             
         except Exception as error:
-            self.log(f'Exception in add_solution_values: {error}')
+            print(f'Exception in add_solution_values: {error}')
             raise
-        
-        
+                
     def create_sim_df(self, data_corr):
-        self.sim_df = pd.DataFrame(data_corr)
-        # Generar los nombres de las filas automáticamente basados en los valores de las columnas 1 y 2
-        new_index_names = [f'Sim{int(col[0])}{int(col[1])}' for _, col in self.sim_df.iterrows()]
-        self.sim_df.index = new_index_names
-        
-        # Renombrar las columnas automáticamente
-        new_column_names = [CORR_COL_0, CORR_COL_1, CORR_COL_2]
-        self.sim_df.columns = new_column_names
+        try:
+            self.sim_df = pd.DataFrame(data_corr)
+            # Generar los nombres de las filas automáticamente basados en los valores de las columnas 1 y 2
+            new_index_names = [f'Sim{int(col[0])}{int(col[1])}' for _, col in self.sim_df.iterrows()]
+            self.sim_df.index = new_index_names
+            
+            # Renombrar las columnas automáticamente
+            new_column_names = [CORR_COL_0, CORR_COL_1, CORR_COL_2]
+            self.sim_df.columns = new_column_names
+
+        except Exception as error:
+            print(f'Exception in create_sim_df: {error}')
+            raise
         
     def create_sol_df(self):
         try:
             col = [SOL_COL_0, SOL_COL_1, SOL_COL_2, SOL_COL_3, SOL_COL_4]
             self.sol_df = pd.DataFrame(columns=col)
         except Exception as error:
-            self.log(f'Exception in create_sol_df: {error}')
+            print(f'Exception in create_sol_df: {error}')
             raise
        
                        
@@ -616,7 +625,7 @@ class C_F_Recommender:
                 self.sol_df = pd.concat([self.sol_df, temp_df], ignore_index=True)
                 
         except Exception as error:
-            self.log(f'Exception in add_solution: {error}')
+            print(f'Exception in add_solution: {error}')
             raise
         
     def list_neighbors_selected(self):
@@ -627,7 +636,7 @@ class C_F_Recommender:
             return list_neighbors_selected
         
         except Exception as error:
-            self.log(f'Exception in list_neighbors_selected: {error}')
+            print(f'Exception in list_neighbors_selected: {error}')
             raise
     
     def create_complete_sim_df(self):
@@ -639,7 +648,7 @@ class C_F_Recommender:
                 self.complete_sim_df.at[f'User{i}', f'User{i}'] = '#'
                             
         except Exception as error:
-            self.log(f'Exception in create_complete_sim_df: {error}')
+            print(f'Exception in create_complete_sim_df: {error}')
             raise
     
     def add_sims(self):
@@ -652,32 +661,28 @@ class C_F_Recommender:
                 self.complete_sim_df.at[user_u_label, user_v_label] = row[CORR_COL_2]
                 
         except Exception as error:
-            self.log(f'Exception in add_sims: {error}')
+            print(f'Exception in add_sims: {error}')
             raise
-    
     
 ### NORMALIZACION ###
     # Normaliza los valores entre 0 y 1
     def normalizar(self, val: float):
-        return (val-self.min_value)/(self.max_value-self.min_value)
+        try:
+            return (val-self.min_value)/(self.max_value-self.min_value)
+
+        except Exception as error:
+            print(f'Exception in normalizar: {error}')
+            raise
     
     # Desnormaliza
     def desnormalizar(self, val: float):
-        sol = val * (self.max_value - self.min_value) + self.min_value
-        return round(sol, ROUND_VALUE) 
-    
-### VISUALIZACION ###
-    def log(self, msg):
-        if self.output_mode == 'console':
-            print(msg)
-        elif self.output_mode == 'file':
-            with open(self.output_file, "a") as f:
-                f.write(str(msg) + "\n")
-    
-    def restore_output_file(self):
-            if os.path.exists(self.output_file):
-                os.remove(self.output_file)
-                
+        try:
+            sol = val * (self.max_value - self.min_value) + self.min_value
+            return round(sol, ROUND_VALUE) 
+
+        except Exception as error:
+            print(f'Exception in desnormalziar: {error}')
+                    
 ### CONTROL DE ERRORES
     def check_utility_matrix_values(self):
         try:
@@ -687,8 +692,8 @@ class C_F_Recommender:
             if not check:
                  raise ValueError(f'Not all values ​​in the utility matrix are within the set range:\n{self.__utility_matrix}')
         except ValueError as ve:
-            self.log(f'Exception in check_utility_matrix_values: {ve}')
-            self.log('Explanation: Check the file input data.')
+            print(f'Exception in check_utility_matrix_values: {ve}')
+            print('Explanation: Check the file input data.')
             raise
     
     def check_utility_df_values(self):
@@ -699,8 +704,8 @@ class C_F_Recommender:
             if not check:
                  raise ValueError(f'Not all values ​​in the utility dataframe are normalized:\n{self.utility_df}')
         except ValueError as ve:
-            self.log(f'Exception in check_utility_df_values: {ve}')
-            self.log('Explanation: Something went wrong in normalization process.')
+            print(f'Exception in check_utility_df_values: {ve}')
+            print('Explanation: Something went wrong in normalization process.')
             raise
             
     def check_same_nan_positions(self, list1, list2):
@@ -714,18 +719,22 @@ class C_F_Recommender:
     
             return True            
         except Exception as error:
-            self.log(f'Exception in check_same_nan_positions: {error}')
+            print(f'Exception in check_same_nan_positions: {error}')
             raise
             
             
     def check_min_item_rating(self):
-        self.invalid_items = []
-        for item in self.utility_df.columns:
-            non_nan_values = self.utility_df[item].dropna()
-            if len(non_nan_values) < MIN_NEIGHBORS:
-                self.invalid_items.append(int(item[4:]))
+        try:
+            self.invalid_items = []
+            for item in self.utility_df.columns:
+                non_nan_values = self.utility_df[item].dropna()
+                if len(non_nan_values) < MIN_NEIGHBORS:
+                    self.invalid_items.append(int(item[4:]))
+            
+            logging.info(f'Invalid items detected: {self.invalid_items}')
         
-        logging.info(f'Invalid items detected: {self.invalid_items}')
+        except Exception as error:
+            print(f'Exception in check_min_item_rating: {error}')
                 
                 
     def limit_sol_val(self):
@@ -737,22 +746,21 @@ class C_F_Recommender:
             return self.sol_val
         
         except Exception as error:
-            self.log(f'Exception in limit_sol_val: {error}')
+            print(f'Exception in limit_sol_val: {error}')
             raise
     
     def incalculable_nan_value(self):
         try:
             self.sol_val = np.nan
             self.add_solution()
-            logging.info(f': : Sol_Val stay NaN')
+            logging.info(': : Sol_Val stay NaN')
             
         except Exception as error:
-            self.log(f'Exception in incalculable_nan_value: {error}')
+            print(f'Exception in incalculable_nan_value: {error}')
             raise
             
     def incalculable_nan_list(self):
         try:
-            # incalculable_nan_list = self.invalid_items
             if not self.use_calculated_nan:
                 self.add_solution_values_to_utility_df()
             
@@ -760,8 +768,50 @@ class C_F_Recommender:
             return self.new_nan_positions
                                
         except Exception as error:
-            self.log(f'Exception en incalculable_nan_list: {error}')
+            print(f'Exception en incalculable_nan_list: {error}')
             raise
+
+### VISUALIZACIÓN    
+    def final_console_output(self):
+        try:
+            input_data = "### INPUT ###\n"
+            input_data += f"File : {self.file_name}\n"
+            input_data += f"Metric: {self.input_metrics}\n"
+            input_data += f"Neighbors: {self.neighbors}\n"
+            input_data += f"Prediction: {self.input_prediction}\n"
+            input_data += f"Use calculated NaN values: {self.use_calculated_nan}\n\n"
+            print(input_data)
+
+            output_data = "### OUTPUT ###\n"
+            pd.options.display.max_columns = 7
+            pd.options.display.max_rows = 20
+            output_data += f"-- Utility Matrix --\n{self.utility_df}\n\n"
+            output_data += f"-- Similarity --\n{self.complete_sim_df}\n\n"
+            output_data += f"-- Solution Table --\n{self.sol_df}\n\n"
+            pd.options.display.max_columns = None
+            pd.options.display.max_rows = None
+            output_data += f"-- Incalculable --\n{self.new_nan_positions}\n"
+            print(output_data)
+
+            print("Complete tracking in the generated tracking.log file")
+            print(f"The results have been exported to excel: {RESULT_XLSX}")
+
+        
+        except Exception as error:
+            print(f"Exception in final_console_output: {error}")
+            raise
+
+    def final_xlsx_output(self):
+        try:
+            with pd.ExcelWriter(RESULT_XLSX, engine='openpyxl', mode='w') as writer:
+                self.utility_df.to_excel(writer, sheet_name="Utility DataFrame")
+                self.complete_sim_df.to_excel(writer, sheet_name="Complete Similarity DataFrame")
+                self.sol_df.to_excel(writer, sheet_name="Solution DataFrame")
+
+        except Exception as error:
+            print(f'Exception in final_csv_output: {error}')
+            raise
+
             
 
          

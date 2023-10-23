@@ -1,22 +1,99 @@
-# Ejecutar con args: 
-## CORRECTOS
+## UM 10-25
+# PEARSON
+* SIMPLE
 
-runfile('tracking_main.py', args='--read utility_matrix_A.txt --metrics pearson --neighbors 2 --prediction media')
-runfile('recommender_main.py', args='--read utility-matrix-5-10-1.txt --metrics pearson --neighbors 2 --prediction media --output file --use_nan')
-runfile('recommender_main.py', args='--read utility-matrix-5-10-1.txt --metrics pearson --neighbors 2 --prediction media --output console --use_nan')
-runfile('recommender_main.py', args='--read utility-matrix-5-10-1.txt --metrics cosine --neighbors 2 --prediction media --output console --use_nan')
-runfile('recommender_main.py', args='--read utility-matrix-5-10-1.txt --metrics euclidean --neighbors 2 --prediction media --output console --use_nan')
-runfile('recommender_main.py', args='--read utility_matrix_B.txt --metrics cosine --neighbors 2 --prediction media --output console --use_nan')
-runfile('recommender_main.py', args='--read utility_matrix_B.txt --metrics pearson --neighbors 2 --prediction media --output console --use_nan')
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics pearson --neighbors 4 --prediction media --use_nan
+# COSINE
+* SIMPLE
 
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics cosine --neighbors 4 --prediction media --use_nan
+# EUCLIDEAN
+* SIMPLE
 
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics euclidean --neighbors 4 --prediction media --use_nan
+## UM 100-1000
+# PEARSON
+* SIMPLE
 
-## ERRORES
-runfile('recommender_main.py', args='--read utility_matrix_ERROR_1.txt --metrics cosine --neighbors 2 --prediction media --output console --use_nan')
-runfile('recommender_main.py', args='--read utility-matrix-5-10-10.txt --metrics cosine --neighbors 2 --prediction media --output console --use_nan')
-runfile('recommender_main.py', args='--read utility-matrix-5-10-9.txt --metrics cosine --neighbors 2 --prediction media --output console --use_nan')
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-100-1000-1.txt --metrics pearson --neighbors 10 --prediction media --use_nan
 
-## CONSOLA NORMAL
-python3 recommender_main.py --read utility-matrix-5-10-10.txt --metrics pearson --neighbors 2 --prediction media --output console --use_nan
+# COSINE
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-100-1000-1.txt --metrics cosine --neighbors 10 --prediction media --use_nan
+
+# EUCLIDEAN
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-100-1000-1.txt --metrics euclidean --neighbors 10 --prediction media --use_nan
+
+## UM 25-100
+# PEARSON
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-25-100-1.txt --metrics pearson --neighbors 8 --prediction media --use_nan
+
+# COSINE
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-25-100-1.txt --metrics cosine --neighbors 8 --prediction media --use_nan
+
+# EUCLIDEAN
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-25-100-1.txt --metrics euclidean --neighbors 8 --prediction media --use_nan
+
+## UM 5-10
+# PEARSON
+* SIMPLE
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-10.txt --metrics pearson --neighbors 2 --prediction simple --use_nan
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-4.txt --metrics pearson --neighbors 2 --prediction simple --use_nan
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-10.txt --metrics pearson --neighbors 2 --prediction media --use_nan
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-10.txt --metrics pearson --neighbors 2 --prediction media 
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-4.txt --metrics pearson --neighbors 2 --prediction media --use_nan
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-4.txt --metrics pearson --neighbors 2 --prediction media
+
+# COSINE
+* SIMPLE
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-4.txt --metrics cosine --neighbors 2 --prediction simple --use_nan
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-4.txt --metrics cosine --neighbors 2 --prediction media --use_nan
+
+# EUCLIDEAN
+* SIMPLE
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-4.txt --metrics euclidean --neighbors 2 --prediction simple --use_nan
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-5-10-4.txt --metrics euclidean --neighbors 2 --prediction media --use_nan
+
+## UM 50-250
+# PEARSON
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-50-250-1.txt --metrics pearson --neighbors 10 --prediction media --use_nan
+
+# COSINE
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-50-250-1.txt --metrics cosine --neighbors 10 --prediction media --use_nan
+# EUCLIDEAN
+* SIMPLE
+
+* MEDIA
+python3 recommender_main.py --read examples-utility-matrices/utility-matrix-50-250-1.txt --metrics euclidean --neighbors 10 --prediction media --use_nan
 
 
