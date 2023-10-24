@@ -7,9 +7,6 @@ Created on Sat Oct 14 18:59:24 2023
 Clase para gestionar todo el proceso del método de filtrado colaborativo
 """
 
-import argparse
-import sys
-import os
 import logging
 import numpy as np
 import pandas as pd
@@ -88,7 +85,11 @@ class C_F_Recommender:
         try:
             # Procesa toda la información de entrada y crea la estructura inicial de datos
             if not self.process_input():
-                return
+                logging.info('### INFEASIBLE ENTRY ###')
+                logging.info(f'No viable unknown value has been found to calculate.\n{self.utility_df}')
+                print('### INFEASIBLE ENTRY ###')
+                print(f'No viable unknown value has been found to calculate.\n{self.utility_df}')
+                return ERROR
             self.create_sol_df()
             self.create_complete_sim_df()
     

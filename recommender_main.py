@@ -6,7 +6,6 @@ Created on Sat Oct 14 19:46:07 2023
 """
 
 import argparse
-import sys
 import numpy as np
 import pandas as pd
 import c_f_recommender_class_with_log as cfrc_lg
@@ -29,5 +28,6 @@ prediction: str = args.prediction
 use_nan = args.use_nan
 
 test = cfrc_lg.C_F_Recommender(file_name, metrics, neighbors, prediction, use_nan)
-test.start()
+result = test.start()
+result
 
