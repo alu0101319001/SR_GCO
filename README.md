@@ -57,7 +57,7 @@ Para ejecutar el código, se debe seguir una línea de ejecución en este format
 
 > python3 recommender_main.py --read examples-utility-matrices/utility-matrix-___[x]___-___[y]___-___[version]___.txt --metrics ___[pearson, cosine, euclidean]___ --neighbors ___[int]___ --prediction ___[simple, media]___ ___[--use_nan]___
 
-En el fichero [how_execute_with_args.md](./how_execute_with_args.md) se muestran varios ejemplos de líneas de ejecución ya predefinidas y calificadas.
+En el fichero [how_execute_with_args.md](./how_execute_with_args.md) se muestran varios ejemplos de líneas de ejecución ya predefinidas y calificadas. El código debe ser ejecutado dentro de la carpeta Code.
 
 Recordar que la salida del programa se muestra en tres formatos. Si desea un resumen de la solución, podrá verlo en la __consola__. La solución completa podrá visualizarse en el fichero `results.xlsx` generado. Por último, el seguimiento completo paso por paso del proceso del código puede verse en el fichero `tracking.log`.
 
