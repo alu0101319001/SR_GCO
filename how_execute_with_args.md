@@ -3,23 +3,23 @@
 ### SIMPLE
 
 ### MEDIA
-- python3 recommender_main.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics pearson --neighbors 4 --prediction media --use_nan
+- python3 analysis.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics pearson --neighbors 4 --prediction media --use_nan
 ## COSINE
 ### SIMPLE
 
 ### MEDIA
-python3 recommender_main.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics cosine --neighbors 4 --prediction media --use_nan
+- python3 analysis.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics cosine --neighbors 4 --prediction media --use_nan
 ## EUCLIDEAN
 ### SIMPLE
 
 ### MEDIA
-python3 recommender_main.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics euclidean --neighbors 4 --prediction media --use_nan
+- python3 analysis.py --read examples-utility-matrices/utility-matrix-10-25-1.txt --metrics euclidean --neighbors 4 --prediction media --use_nan
 # UM 100-1000
 ## PEARSON
 ### SIMPLE
 
 ### MEDIA
-python3 recommender_main.py --read examples-utility-matrices/utility-matrix-100-1000-1.txt --metrics pearson --neighbors 10 --prediction media --use_nan
+- python3 recommender_main.py --read examples-utility-matrices/utility-matrix-100-1000-1.txt --metrics pearson --neighbors 10 --prediction media --use_nan
 
 ## COSINE
 ### SIMPLE
